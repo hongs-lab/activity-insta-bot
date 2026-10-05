@@ -1,7 +1,7 @@
 name: daily-post
 on:
   schedule:
-    - cron: "7 0 * * *" # 매일 09:07 KST (정각은 Actions 지연이 심함)
+    - cron: "41 23 * * *" # 매일 08:41 KST. 00시(UTC)대는 전 세계 일일 cron이 몰려 5시간 넘게 밀린 적이 있어 그 직전으로 옮김
   workflow_dispatch:
 permissions:
   contents: write

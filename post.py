@@ -1,4 +1,4 @@
-"""하루 한 건: 위비티/링커리어 대외활동 공고 → 인스타그램 게시. 표준 라이브러리만 사용.
+"""하루 한 건: 위비티/링커리어 SW 공모전 공고 → 인스타그램 게시. 표준 라이브러리만 사용.
 
 IG_ACCESS_TOKEN 없이 실행하면 게시하지 않고 올릴 내용만 출력한다(dry-run).
 """
@@ -20,14 +20,23 @@ KST = timezone(timedelta(hours=9))
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
 GRAPH = "https://graph.instagram.com"
 POSTED = Path(__file__).with_name("posted.txt")
-HASHTAGS = "#대외활동 #공모전 #서포터즈 #대학생 #대학생대외활동 #스펙"
+HASHTAGS = "#공모전 #SW공모전 #IT공모전 #해커톤 #개발자 #코딩 #대학생"
 
 # (목록 URL, 공고 id 정규식, 상세 URL 템플릿)
 # 온오프믹스는 robots.txt가 일반 봇을 전면 차단(Disallow: /)해서 넣지 않았다.
+WEVITY = (r"gbn=view[^\"']*?ix=(\d+)", "https://www.wevity.com/?c=find&s=1&gub=1&gbn=view&ix={}")
 SOURCES = [
-    ("https://www.wevity.com/?c=find&s=1&gub=1&cidx=27", r"gbn=view[^\"']*?ix=(\d+)", "https://www.wevity.com/?c=find&s=1&gub=1&gbn=view&ix={}"),
-    ("https://linkareer.com/list/activity", r"/activity/(\d+)", "https://linkareer.com/activity/{}"),
+    ("https://www.wevity.com/?c=find&s=1&gub=1&cidx=20", *WEVITY),  # 웹/모바일/IT
+    ("https://www.wevity.com/?c=find&s=1&gub=1&cidx=21", *WEVITY),  # 게임/소프트웨어
+    ("https://linkareer.com/list/contest?filterBy_categoryIDs=35", r"/activity/(\d+)", "https://linkareer.com/activity/{}"),  # 공모전 > 과학/공학
 ]
+
+# ponytail: 카테고리만으로는 광고 고정글·e스포츠·사진 공모전이 섞여서 제목 키워드로 한 번 더 거른다.
+# 놓치는 공고나 잘못 올라가는 공고가 보이면 이 정규식만 고치면 된다.
+SW = re.compile(
+    r"(?<![A-Za-z])(?:AI|SW|IT|ICT)(?![A-Za-z])"  # 영문 약어는 Competition의 it 같은 오탐을 막으려 대문자·단어 단위로만
+    r"|소프트웨어|인공지능|해커톤|프로그래밍|코딩|개발자|데이터|알고리즘|오픈소스|보안|해킹|버그바운티|앱|웹(?!툰|소설)"
+)
 
 
 def get(url, data=None):
@@ -51,7 +60,7 @@ def candidates():
             print(f"목록 실패 {list_url}: {e}", file=sys.stderr)
             ids = []
         lists.append([detail.format(i) for i in ids])
-    return [u for group in zip_longest(*lists) for u in group if u]
+    return list(dict.fromkeys(u for group in zip_longest(*lists) for u in group if u))  # 위비티는 두 카테고리에 같은 공고가 겹친다
 
 
 def activity(page):
@@ -129,7 +138,14 @@ def main():
     for url in urls:
         if url in posted:
             continue
-        page = get(url)
+        time.sleep(1)  # 상세 페이지를 연달아 긁으면 링커리어가 연결을 끊는다
+        try:
+            page = get(url)
+        except OSError as e:  # 상세 하나가 죽어도 다음 공고로 (내일 다시 시도됨)
+            print(f"상세 실패 {url}: {e}", file=sys.stderr)
+            continue
+        if not SW.search(og(page, "title")):
+            continue
         src = poster(page)
         if not src:  # 포스터 없는 공고는 건너뜀
             continue

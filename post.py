@@ -45,6 +45,14 @@ def is_dev(title):
     return bool(DEV.search(title)) and not NOT_DEV.search(title)
 
 
+def title_key(title):
+    """사이트마다 다른 표기([주최], 띄어쓰기, 기호)를 지운 제목. 같은 공모전이 다른 URL로 또 올라가는 걸 막는다."""
+    # ponytail: 표기만 다른 중복만 잡는다. 제목 자체를 다르게 등록한 중복까지 잡으려면 difflib 유사도로 교체
+    # (그 경우 '제5회'/'제6회'처럼 회차만 다른 공고를 중복으로 오인하지 않게 주의).
+    squash = lambda s: re.sub(r"\W", "", s).casefold()
+    return squash(re.sub(r"\[[^\]]*\]|【[^】]*】|\([^)]*\)", "", title)) or squash(title)
+
+
 def get(url, data=None):
     req = Request(url, data=urlencode(data).encode() if data else None, headers={"User-Agent": UA})
     with urlopen(req, timeout=30) as r:
@@ -150,7 +158,9 @@ def main():
         except OSError as e:  # 상세 하나가 죽어도 다음 공고로 (내일 다시 시도됨)
             print(f"상세 실패 {url}: {e}", file=sys.stderr)
             continue
-        if not is_dev(og(page, "title")):
+        title = og(page, "title").split(" | ")[0]
+        key = title_key(title)
+        if not is_dev(title) or key in posted:  # 다른 사이트에서 이미 올린 공모전이면 건너뜀
             continue
         src = poster(page)
         if not src:  # 포스터 없는 공고는 건너뜀
@@ -171,7 +181,7 @@ def main():
                 sys.exit("연속 3건 실패 — 중단")
             continue
         with POSTED.open("a") as f:
-            f.write(url + "\n")
+            f.write(f"{url} {key}\n")
         print("게시 완료:", url)
         return
     if failures:

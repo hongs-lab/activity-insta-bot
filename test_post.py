@@ -1,5 +1,12 @@
-"""해커톤·개발 공모전 필터 자가 점검: python3 test_post.py"""
-from post import is_dev
+"""해커톤·개발 공모전 필터·중복 판별 자가 점검: python3 test_post.py"""
+from post import is_dev, title_key
+
+# 같은 공모전은 사이트별 표기가 달라도 같은 키
+assert title_key("[서울대학교 창업지원단·H1R AI] 2026 SNU X Croche AI 앱 해커톤") == title_key("2026 SNU X Croche AI 앱 해커톤")
+assert title_key("[데이콘]합성 미세구조 기반 재료 물성 예측 AI 경진대회(~10/19)") == title_key("합성 미세구조 기반 재료 물성 예측 AI 경진대회")
+# 회차가 다르면 다른 공모전
+assert title_key("2026 제5회 오픈소스 SW개발 경진대회") != title_key("2027 제6회 오픈소스 SW개발 경진대회")
+assert title_key("[SW 해커톤]")  # 괄호뿐인 제목도 빈 키가 되지 않는다
 
 for title in [
     "[과학기술정보통신부] 제3회 미래융합인재 발굴 소프트웨어 챌린지",

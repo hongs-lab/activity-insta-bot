@@ -32,11 +32,17 @@ SOURCES = [
 ]
 
 # ponytail: 카테고리만으로는 광고 고정글·e스포츠·사진 공모전이 섞여서 제목 키워드로 한 번 더 거른다.
-# 놓치는 공고나 잘못 올라가는 공고가 보이면 이 정규식만 고치면 된다.
-SW = re.compile(
-    r"(?<![A-Za-z])(?:AI|SW|IT|ICT)(?![A-Za-z])"  # 영문 약어는 Competition의 it 같은 오탐을 막으려 대문자·단어 단위로만
-    r"|소프트웨어|인공지능|해커톤|프로그래밍|코딩|개발자|데이터|알고리즘|오픈소스|보안|해킹|버그바운티|앱|웹(?!툰|소설)"
+# 놓치는 공고나 잘못 올라가는 공고가 보이면 이 두 정규식만 고치면 된다.
+DEV = re.compile(
+    r"해커톤|개발|(?<![A-Za-z])SW(?![A-Za-z])|소프트웨어|프로그래밍|코딩|알고리즘|오픈소스|해킹|버그바운티"
+    r"|(?:AI|인공지능|데이터).*경진대회"  # AI는 아무 공모전에나 붙어서 경진대회일 때만 인정
 )
+NOT_DEV = re.compile(r"영상|사진|콘텐츠|이미지|음악|뮤직|작곡|동화|만화|웹툰|숏폼|UCC|캐릭터|시나리오|그래픽")
+
+
+def is_dev(title):
+    """해커톤·개발 공모전인지 제목으로 판별."""
+    return bool(DEV.search(title)) and not NOT_DEV.search(title)
 
 
 def get(url, data=None):
@@ -144,7 +150,7 @@ def main():
         except OSError as e:  # 상세 하나가 죽어도 다음 공고로 (내일 다시 시도됨)
             print(f"상세 실패 {url}: {e}", file=sys.stderr)
             continue
-        if not SW.search(og(page, "title")):
+        if not is_dev(og(page, "title")):
             continue
         src = poster(page)
         if not src:  # 포스터 없는 공고는 건너뜀

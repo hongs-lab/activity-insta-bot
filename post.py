@@ -141,7 +141,10 @@ def main():
     token = os.environ.get("IG_ACCESS_TOKEN")
     if not token and os.environ.get("CI"):
         sys.exit("IG_ACCESS_TOKEN secret이 없습니다")
-    uid = json.loads(get(f"{GRAPH}/me?fields=user_id&access_token={token}"))["user_id"] if token else None
+    try:
+        uid = json.loads(get(f"{GRAPH}/me?fields=user_id&access_token={token}"))["user_id"] if token else None
+    except HTTPError as e:  # 토큰 만료·폐기·오입력. 인스타가 준 사유를 로그에 남긴다
+        sys.exit(f"IG_ACCESS_TOKEN을 인스타가 거부함: {e.read().decode('utf-8', 'replace')}")
 
     posted = set(POSTED.read_text().split())
     urls = candidates()

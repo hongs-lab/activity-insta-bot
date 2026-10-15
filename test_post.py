@@ -1,5 +1,5 @@
 """해커톤·개발 공모전 필터·중복 판별 자가 점검: python3 test_post.py"""
-from post import is_dev, title_key
+from post import is_dev, is_uou_contest, title_key
 
 # 같은 공모전은 사이트별 표기가 달라도 같은 키
 assert title_key("[서울대학교 창업지원단·H1R AI] 2026 SNU X Croche AI 앱 해커톤") == title_key("2026 SNU X Croche AI 앱 해커톤")
@@ -28,5 +28,24 @@ for title in [
     "제 3회 AI·디지털 융합 교육 콘텐츠 개발 경진대회 참가자 모집",  # 개발이지만 콘텐츠 제작
 ]:
     assert not is_dev(title), title
+
+# 울산대 SW중심대학사업단 공지: 대회 모집만, 결과·수상·마감 공지는 제외
+for title in [
+    "[SW중심대학사업단]2026 대구울산경북 대학교 x Upstage AI Agent 해커톤 울산대학교 참가자 모집",
+    "[SW중심대학사업단] 2026-2학기 프로그래밍 경진대회",
+    "[SW융합교육센터] 2026 SUMTECH Hackathon 참가자 모집",
+    "[SW중심대학사업단] 2026 UOU로봇 OS특강 + 피지컬 AI 챌린지 대회",
+    "[SW융합교육센터] 2026학년도 제1회 AI를 활용한 사회문제해결 아이디어 공모전 개최",
+]:
+    assert is_uou_contest(title), title
+
+for title in [
+    "[SW중심대학사업단] 2026-2학기 U-Point 설명회 PPT 자료",
+    "2026 캡스톤디자인 경진대회 ★수상자 발표★",
+    "[SW융합교육센터] (최종 결과)2026학년도 제1회 AI를 활용한 사회문제해결 아이디어 공모전",
+    "(마감)[외부프로그램][단순홍보]2026 울산SW미래채움 초중등 AI·SW 해커톤 대회 대학생 멘토 모집",
+    "[울산대 SW중심대학사업단] 2026-2 SW 서포터즈 모집",
+]:
+    assert not is_uou_contest(title), title
 
 print("ok")

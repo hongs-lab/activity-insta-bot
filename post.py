@@ -1,4 +1,4 @@
-"""하루 한 건: 위비티/링커리어 SW 공모전 공고 → 인스타그램 게시. 표준 라이브러리만 사용.
+"""하루 한 건: 울산대 SW중심대학사업단 공지(대회, 우선)·위비티/링커리어 SW 공모전 공고 → 인스타그램 게시. 표준 라이브러리만 사용.
 
 IG_ACCESS_TOKEN 없이 실행하면 게시하지 않고 올릴 내용만 출력한다(dry-run).
 """
@@ -39,10 +39,21 @@ DEV = re.compile(
 )
 NOT_DEV = re.compile(r"영상|사진|콘텐츠|이미지|음악|뮤직|작곡|동화|만화|웹툰|숏폼|UCC|캐릭터|시나리오|그래픽")
 
+# 울산대 SW중심대학사업단 공지사항의 대회 공고는 필수 게시 → 개발 키워드 필터 없이 다른 사이트보다 먼저 올린다.
+UOU_LIST = "https://prd-community.didisam.com/api/v3/sampage/notice/community?page_size=20"  # 공지 목록 API(사이트 화면이 부르는 것)
+UOU_NOTICE = "https://sw.ulsan.ac.kr/site/swulsan/notices/"
+UOU_CONTEST = re.compile(r"해커톤|hackathon|대회|공모전|챌린지", re.I)
+UOU_NOT = re.compile(r"수상|결과|마감")  # 수상자·결과 발표, 마감 공지
+
 
 def is_dev(title):
     """해커톤·개발 공모전인지 제목으로 판별."""
     return bool(DEV.search(title)) and not NOT_DEV.search(title)
+
+
+def is_uou_contest(title):
+    """울산대 SW중심대학사업단 공지 중 참가자를 모으는 대회 공고인지."""
+    return bool(UOU_CONTEST.search(title)) and not UOU_NOT.search(title)
 
 
 def title_key(title):
@@ -53,8 +64,8 @@ def title_key(title):
     return squash(re.sub(r"\[[^\]]*\]|【[^】]*】|\([^)]*\)", "", title)) or squash(title)
 
 
-def get(url, data=None):
-    req = Request(url, data=urlencode(data).encode() if data else None, headers={"User-Agent": UA})
+def get(url, data=None, headers=None):
+    req = Request(url, data=urlencode(data).encode() if data else None, headers={"User-Agent": UA, **(headers or {})})
     with urlopen(req, timeout=30) as r:
         return r.read().decode("utf-8", "replace")
 
@@ -64,8 +75,19 @@ def og(page, prop):
     return html.unescape(m.group(1)).replace("\xa0", " ").strip() if m else ""
 
 
+def uou_notices():
+    """울산대 SW중심대학사업단 최신 공지 20건 중 대회 공고 URL. 상단 고정 공지가 목록에 한 번 더 나와서 중복 제거."""
+    data = json.loads(get(UOU_LIST, headers={"slug": "swulsan"}))["result"]["data"]
+    return list(dict.fromkeys(UOU_NOTICE + str(n["notice_id"]) for n in data if is_uou_contest(n["title"])))
+
+
 def candidates():
-    """사이트별 최신 공고 URL을 번갈아 섞어서 반환."""
+    """울산대 공지 대회를 맨 앞에, 그 뒤로 사이트별 최신 공고 URL을 번갈아 섞어서 반환."""
+    try:
+        uou = uou_notices()
+    except (OSError, ValueError, KeyError, TypeError) as e:  # API 구조가 바뀌어도 다른 사이트로 진행
+        print(f"울산대 공지 목록 실패: {e!r}", file=sys.stderr)
+        uou = []
     lists = []
     for list_url, pattern, detail in SOURCES:
         try:
@@ -74,7 +96,7 @@ def candidates():
             print(f"목록 실패 {list_url}: {e}", file=sys.stderr)
             ids = []
         lists.append([detail.format(i) for i in ids])
-    return list(dict.fromkeys(u for group in zip_longest(*lists) for u in group if u))  # 위비티는 두 카테고리에 같은 공고가 겹친다
+    return uou + list(dict.fromkeys(u for group in zip_longest(*lists) for u in group if u))  # 위비티는 두 카테고리에 같은 공고가 겹친다
 
 
 def activity(page):
@@ -101,7 +123,7 @@ def caption(page, url):
     if a.get("recruitCloseAt"):  # 링커리어는 og 설명에 주최·마감일이 없어서 보충
         close = datetime.fromtimestamp(a["recruitCloseAt"] / 1000, KST)
         desc += f"\n\n🏢 주최: {a.get('organizationName') or '-'}\n⏰ 마감: {close:%Y.%m.%d}"
-    return f"📌 {title}\n\n{desc}\n\n🔗 {url}\n\n{HASHTAGS}"
+    return "\n\n".join(filter(None, [f"📌 {title}", desc, f"🔗 {url}", HASHTAGS]))  # 울산대 공지는 본문이 포스터뿐이라 설명이 빌 수 있다
 
 
 def image_url(src):
@@ -163,7 +185,7 @@ def main():
             continue
         title = og(page, "title").split(" | ")[0]
         key = title_key(title)
-        if not is_dev(title) or key in posted:  # 다른 사이트에서 이미 올린 공모전이면 건너뜀
+        if not (url.startswith(UOU_NOTICE) or is_dev(title)) or key in posted:  # 다른 사이트에서 이미 올린 공모전이면 건너뜀
             continue
         src = poster(page)
         if not src:  # 포스터 없는 공고는 건너뜀
